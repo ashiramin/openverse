@@ -7,6 +7,11 @@ import {
 } from "~~/test/playwright/utils/navigation"
 import { mockProviderApis } from "~~/test/playwright/utils/route"
 
+import {
+  collectAnalyticsEvents,
+  expectEventPayloadToMatch,
+} from "~~/test/playwright/utils/analytics"
+
 import { AUDIO, IMAGE, SupportedMediaType } from "~/constants/media"
 
 test.describe.configure({ mode: "parallel" })
@@ -123,8 +128,98 @@ test.describe("Load more button", () => {
           mode,
           searchType: AUDIO,
         })
-        await expect(page.locator(loadMoreButton)).not.toBeVisible()
+        await expect(page.locator(loadMoreButton)).toBeHidden()
       })
     })
   }
+
+  test.describe("Analytics events", () => {
+    /**
+     * Checks that an analytics event is posted to /api/event and has the correct
+     * payload for the REACH_RESULT_END event.
+     */
+    test(`Sends a valid REACH_RESULT_END event when user reaches the load more page`, async ({
+      page,
+      context,
+    }) => {
+      const analyticsEvents = collectAnalyticsEvents(context)
+
+      await page.goto("/search/?q=cat")
+
+      await page.locator(loadMoreButton).scrollIntoViewIfNeeded()
+      await expect(page.locator(loadMoreButton)).toBeVisible()
+
+      const reachResultEndEvent = analyticsEvents.find(
+        (event) => event.n === "REACH_RESULT_END"
+      )
+
+      expectEventPayloadToMatch(reachResultEndEvent, {
+        query: "cat",
+        searchType: "all",
+        resultPage: 1,
+      })
+    })
+
+    test(`is sent when loading one page of results.`, async ({
+      page,
+      context,
+    }) => {
+      const analyticsEvents = collectAnalyticsEvents(context)
+
+      await goToSearchTerm(page, "cat")
+      await page.click(loadMoreButton)
+
+      const loadMoreEvent = analyticsEvents.find(
+        (event) => event.n === "LOAD_MORE_RESULTS"
+      )
+
+      expectEventPayloadToMatch(loadMoreEvent, {
+        query: "cat",
+        searchType: "all",
+        resultPage: 1,
+      })
+    })
+
+    test(`is sent when loading two pages of results.`, async ({
+      page,
+      context,
+    }) => {
+      const analyticsEvents = collectAnalyticsEvents(context)
+
+      await goToSearchTerm(page, "cat")
+      await expect(page.locator(loadMoreButton)).toBeVisible()
+
+      await page.click(loadMoreButton)
+      await page.click(loadMoreButton)
+
+      const loadMoreEvents = analyticsEvents.filter(
+        (event) => event.n === "LOAD_MORE_RESULTS"
+      )
+
+      expect(loadMoreEvents.length).toBe(2)
+      loadMoreEvents.every((event, index) =>
+        expectEventPayloadToMatch(event, {
+          query: "cat",
+          searchType: "all",
+          resultPage: index + 1,
+        })
+      )
+    })
+
+    test(`is not sent when more results are not loaded.`, async ({
+      page,
+      context,
+    }) => {
+      const analyticsEvents = collectAnalyticsEvents(context)
+
+      await goToSearchTerm(page, "cat")
+      await expect(page.locator(loadMoreButton)).toBeVisible()
+
+      const loadMoreEvents = analyticsEvents.filter(
+        (event) => event.n === "LOAD_MORE_RESULTS"
+      )
+
+      expect(loadMoreEvents.length).toBe(0)
+    })
+  })
 })

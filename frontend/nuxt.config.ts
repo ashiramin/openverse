@@ -135,7 +135,6 @@ const config: NuxtConfig = {
     { path: "~/components", extensions: ["vue"], pathPrefix: false },
   ],
   plugins: [
-    "~/plugins/migration-notice.ts",
     "~/plugins/ua-parse.ts",
     "~/plugins/focus-visible.client.ts",
     "~/plugins/api-token.server.ts",
@@ -153,7 +152,6 @@ const config: NuxtConfig = {
     "@nuxt/typescript-build",
     "@nuxtjs/composition-api/module",
     "@nuxtjs/svg-sprite",
-    "@nuxtjs/eslint-module",
     "@pinia/nuxt",
   ],
   modules: [
@@ -261,6 +259,16 @@ const config: NuxtConfig = {
       config.devtool = ctx.isClient ? "source-map" : "inline-source-map"
     },
   },
+  typescript: {
+    typeCheck: {
+      typescript: {
+        configFile: "../tsconfig.json",
+        extensions: {
+          vue: true,
+        },
+      },
+    },
+  },
   storybook: {
     port: 6006, // standard port for Storybook
     stories: ["~/**/*.stories.@(mdx|js)"],
@@ -312,6 +320,16 @@ const config: NuxtConfig = {
         (isProdNotPlaywright
           ? "https://openverse.org"
           : `http://localhost:${port}`),
+    },
+    sentry: {
+      config: {
+        // We need to explicitly configure this for the frontend to have
+        // access to it at runtime. On the server side it would be picked
+        // up from the environment; the client-side doesn't have that
+        // luxury of a configured runtime environment, so we need to
+        // tell it what environment it is in.
+        environment: process.env.SENTRY_ENVIRONMENT,
+      },
     },
   },
 }

@@ -1,11 +1,6 @@
 <template>
   <header
-    class="main-header z-30 flex w-full items-stretch justify-between gap-x-2 border-b bg-white px-6 py-4"
-    :class="
-      isHeaderScrolled || isSidebarVisible
-        ? 'border-dark-charcoal-20'
-        : 'border-white'
-    "
+    class="main-header z-30 flex w-full items-stretch justify-between gap-x-2 bg-white px-6 py-4"
   >
     <VLogoButton :is-fetching="isFetching" />
 
@@ -52,7 +47,7 @@ import { useMediaStore } from "~/stores/media"
 import { useSearchStore } from "~/stores/search"
 import { useUiStore } from "~/stores/ui"
 
-import { IsHeaderScrolledKey, IsSidebarVisibleKey } from "~/types/provides"
+import { IsSidebarVisibleKey } from "~/types/provides"
 
 import { useAnalytics } from "~/composables/use-analytics"
 import { useSearch } from "~/composables/use-search"
@@ -64,6 +59,8 @@ import VSearchBar from "~/components/VHeader/VSearchBar/VSearchBar.vue"
 import VLogoButton from "~/components/VHeader/VLogoButton.vue"
 import VSearchBarButton from "~/components/VHeader/VHeaderMobile/VSearchBarButton.vue"
 import VSearchTypePopover from "~/components/VContentSwitcher/VSearchTypePopover.vue"
+
+import type { Ref } from "vue"
 
 /**
  * The desktop search header.
@@ -85,8 +82,7 @@ export default defineComponent({
     const searchStore = useSearchStore()
     const uiStore = useUiStore()
 
-    const isHeaderScrolled = inject(IsHeaderScrolledKey)
-    const isSidebarVisible = inject(IsSidebarVisibleKey)
+    const isSidebarVisible = inject<Ref<boolean>>(IsSidebarVisibleKey)
 
     const isFetching = computed(() => mediaStore.fetchState.isFetching)
 
@@ -102,15 +98,23 @@ export default defineComponent({
 
     const handleSearch = async () => {
       window.scrollTo({ top: 0, left: 0, behavior: "auto" })
-
-      document.activeElement?.blur()
+      const activeElement = document.activeElement as HTMLElement
+      activeElement?.blur()
       updateSearchState()
     }
+
     const areFiltersDisabled = computed(
       () => !searchStore.searchTypeIsSupported
     )
 
-    const toggleSidebar = () => uiStore.toggleFilters()
+    const toggleSidebar = () => {
+      const toState = isSidebarVisible?.value ? "closed" : "opened"
+      sendCustomEvent("TOGGLE_FILTER_SIDEBAR", {
+        searchType: searchStore.searchType,
+        toState,
+      })
+      uiStore.toggleFilters()
+    }
 
     const isXl = computed(() => uiStore.isBreakpoint("xl"))
 
@@ -119,7 +123,6 @@ export default defineComponent({
       searchBarRef,
       isFetching,
 
-      isHeaderScrolled,
       isSidebarVisible,
       areFiltersDisabled,
       isXl,

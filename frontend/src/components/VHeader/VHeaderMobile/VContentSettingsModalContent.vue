@@ -49,10 +49,16 @@
           @select="$emit('select', $event)"
         />
       </VTabPanel>
-      <VTabPanel v-if="showFilters" id="filters">
+      <!-- Horizontal padding removed to display divider. -->
+      <VTabPanel v-if="showFilters" id="filters" class="px-0">
         <VSearchGridFilter
+          class="px-6"
           :show-filter-header="false"
           :change-tab-order="false"
+        />
+        <VSafeBrowsing
+          v-if="isSensitiveContentEnabled"
+          class="border-t border-dark-charcoal-20 px-6 pt-6"
         />
       </VTabPanel>
     </VTabs>
@@ -74,9 +80,10 @@
   </VModalContent>
 </template>
 <script lang="ts">
-import { computed, defineComponent, ref } from "vue"
+import { computed, defineComponent, PropType, ref } from "vue"
 
 import { useSearchStore } from "~/stores/search"
+import { useFeatureFlagStore } from "~/stores/feature-flag"
 
 import useSearchType from "~/composables/use-search-type"
 
@@ -92,10 +99,14 @@ import VShowResultsButton from "~/components/VHeader/VHeaderMobile/VShowResultsB
 import VTab from "~/components/VTabs/VTab.vue"
 import VTabPanel from "~/components/VTabs/VTabPanel.vue"
 import VTabs from "~/components/VTabs/VTabs.vue"
+import VSafeBrowsing from "~/components/VSafeBrowsing/VSafeBrowsing.vue"
+
+type ContentSettingsTab = "content-settings" | "filters"
 
 export default defineComponent({
   name: "VContentSettingsModalContent",
   components: {
+    VSafeBrowsing,
     VCloseButton,
     VIcon,
     VModalContent,
@@ -114,7 +125,7 @@ export default defineComponent({
       default: false,
     },
     close: {
-      type: Function,
+      type: Function as PropType<() => void>,
       required: true,
     },
     visible: {
@@ -133,9 +144,9 @@ export default defineComponent({
   setup(props) {
     const searchStore = useSearchStore()
     const content = useSearchType()
-    const selectedTab = ref<"content-settings" | "filters">("content-settings")
-    const changeSelectedTab = (tab: "content-settings" | "filters") => {
-      selectedTab.value = tab
+    const selectedTab = ref<ContentSettingsTab>("content-settings")
+    const changeSelectedTab = (tab: string) => {
+      selectedTab.value = tab as ContentSettingsTab
     }
 
     const areFiltersSelected = computed(() => searchStore.isAnyFilterApplied)
@@ -156,7 +167,14 @@ export default defineComponent({
       searchStore.clearFilters()
     }
 
+    const featureStore = useFeatureFlagStore()
+    const isSensitiveContentEnabled = computed(() =>
+      featureStore.isOn("sensitive_content")
+    )
+
     return {
+      isSensitiveContentEnabled,
+
       searchType,
 
       selectedTab,

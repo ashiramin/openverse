@@ -1,48 +1,61 @@
 <template>
-  <div
-    class="app grid h-[100dvh] h-[100vh] min-h-[100dvh] min-h-[100vh] grid-rows-[auto,1fr,auto] bg-white"
-    :class="[
-      isDesktopLayout ? 'desktop' : 'mobile',
-      breakpoint,
-      { 'has-sidebar': isSidebarVisible },
-      isSidebarVisible
-        ? 'grid-cols-[1fr_var(--filter-sidebar-width)]'
-        : 'grid-cols-1',
-    ]"
-  >
-    <div class="header-el bg-white">
-      <VTeleportTarget name="skip-to-content" :force-destroy="true" />
-      <VBanners />
-      <VHeaderDesktop v-if="isDesktopLayout" class="h-20 bg-white" />
-      <VHeaderMobile v-else class="h-20 bg-white" />
-    </div>
-
-    <aside
-      v-if="isSidebarVisible"
-      class="sidebar end-0 z-10 h-full overflow-y-auto border-s border-dark-charcoal-20 bg-dark-charcoal-06"
-    >
-      <VSearchGridFilter class="px-10 pb-10 pt-8" @close="closeSidebar" />
-    </aside>
-
+  <div>
+    <VSkipToContentButton />
     <div
-      id="main-page"
-      class="main-page flex h-full w-full min-w-0 flex-col justify-between overflow-y-auto"
+      class="app grid h-[100dvh] h-[100vh] min-h-[100dvh] min-h-[100vh] grid-rows-[auto,1fr,auto] bg-white"
+      :class="[
+        isDesktopLayout ? 'desktop' : 'mobile',
+        breakpoint,
+        { 'has-sidebar': isSidebarVisible },
+        isSidebarVisible
+          ? 'grid-cols-[1fr_var(--filter-sidebar-width)]'
+          : 'grid-cols-1',
+      ]"
     >
-      <Nuxt />
-      <VFooter
-        mode="content"
-        class="border-t border-dark-charcoal-20 bg-white"
-      />
-    </div>
+      <div class="header-el bg-white">
+        <VBanners />
+        <VHeaderDesktop
+          v-if="isDesktopLayout"
+          class="h-20 border-b bg-white"
+          :class="headerBorder"
+        />
+        <VHeaderMobile
+          v-else
+          class="h-20 border-b bg-white"
+          :class="headerBorder"
+        />
+      </div>
 
-    <VModalTarget class="modal" />
-    <VGlobalAudioSection />
+      <aside
+        v-if="isSidebarVisible"
+        class="sidebar end-0 z-10 h-full overflow-y-auto border-s border-dark-charcoal-20 bg-dark-charcoal-06"
+      >
+        <VSearchGridFilter class="px-10 py-8" />
+        <VSafeBrowsing
+          v-if="isSensitiveContentEnabled"
+          class="border-t border-dark-charcoal-20 px-10 py-8"
+        />
+      </aside>
+
+      <div
+        id="main-page"
+        class="main-page flex h-full w-full min-w-0 flex-col justify-between overflow-y-auto"
+      >
+        <Nuxt />
+        <VFooter
+          mode="content"
+          class="border-t border-dark-charcoal-20 bg-white"
+        />
+      </div>
+
+      <VModalTarget class="modal" />
+      <VGlobalAudioSection />
+    </div>
   </div>
 </template>
 <script lang="ts">
 import { computed, defineComponent, onMounted, provide, ref, watch } from "vue"
 import { useScroll } from "@vueuse/core"
-import { PortalTarget as VTeleportTarget } from "portal-vue"
 
 import { useLayout } from "~/composables/use-layout"
 
@@ -61,6 +74,7 @@ import VFooter from "~/components/VFooter/VFooter.vue"
 import VModalTarget from "~/components/VModal/VModalTarget.vue"
 import VGlobalAudioSection from "~/components/VGlobalAudioSection/VGlobalAudioSection.vue"
 import VSearchGridFilter from "~/components/VFilters/VSearchGridFilter.vue"
+import VSkipToContentButton from "~/components/VSkipToContentButton.vue"
 
 /**
  * This is the SearchLayout: the search page that has a sidebar.
@@ -69,13 +83,13 @@ import VSearchGridFilter from "~/components/VFilters/VSearchGridFilter.vue"
 export default defineComponent({
   name: "SearchLayout",
   components: {
+    VSkipToContentButton,
     VBanners,
     VHeaderDesktop: () => import("~/components/VHeader/VHeaderDesktop.vue"),
     VHeaderMobile: () =>
       import("~/components/VHeader/VHeaderMobile/VHeaderMobile.vue"),
     VFooter,
     VModalTarget,
-    VTeleportTarget,
     VGlobalAudioSection,
     VSearchGridFilter,
   },
@@ -90,6 +104,9 @@ export default defineComponent({
     onMounted(() => {
       featureStore.initFromSession()
     })
+    const isSensitiveContentEnabled = computed(() =>
+      featureStore.isOn("sensitive_content")
+    )
 
     const { updateBreakpoint } = useLayout()
 
@@ -116,10 +133,6 @@ export default defineComponent({
         isDesktopLayout.value
     )
 
-    const closeSidebar = () => {
-      uiStore.setFiltersState(false)
-    }
-
     const isHeaderScrolled = ref(false)
     const showScrollButton = ref(false)
 
@@ -144,7 +157,15 @@ export default defineComponent({
     provide(IsHeaderScrolledKey, isHeaderScrolled)
     provide(IsSidebarVisibleKey, isSidebarVisible)
 
+    const headerBorder = computed(() =>
+      isHeaderScrolled.value || isSidebarVisible.value
+        ? "border-b-dark-charcoal-20"
+        : "border-b-tx"
+    )
+
     return {
+      isSensitiveContentEnabled,
+
       mainPageRef,
       headerRef,
 
@@ -153,7 +174,7 @@ export default defineComponent({
       isSidebarVisible,
       breakpoint,
 
-      closeSidebar,
+      headerBorder,
     }
   },
   head() {

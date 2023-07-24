@@ -13,6 +13,8 @@ import {
   VIDEO,
 } from "~/constants/media"
 
+import type { Breakpoint } from "~/constants/screens"
+
 import type { BrowserContext, Locator, Page } from "@playwright/test"
 
 const messages: Record<string, Record<string, unknown>> = {
@@ -62,8 +64,8 @@ export const renderingContexts = [
 ] as const
 
 export const renderModes = ["SSR", "CSR"] as const
-export type RenderMode = typeof renderModes[number]
-export type LanguageDirection = typeof languageDirections[number]
+export type RenderMode = (typeof renderModes)[number]
+export type LanguageDirection = (typeof languageDirections)[number]
 
 export function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -192,26 +194,6 @@ export const isDialogOpen = async (page: Page) => {
   return page.getByRole("dialog").isVisible({ timeout: 100 })
 }
 
-/**
- * Asserts that the checkbox has the given status.
- *
- * @param page - Playwright page object
- * @param label - the label of the checkbox, converted to a RegExp if string
- * @param status - the status to assert
- */
-export const assertCheckboxStatus = async (
-  page: Page,
-  label: string | RegExp,
-  status: CheckboxStatus = "checked"
-) => {
-  const labelRegexp = typeof label === "string" ? new RegExp(label, "i") : label
-  await page.getByRole("checkbox", {
-    name: labelRegexp,
-    disabled: status === "disabled",
-    checked: status === "checked",
-  })
-}
-
 export const changeSearchType = async (page: Page, to: SupportedSearchType) => {
   await searchTypes.open(page)
 
@@ -293,6 +275,15 @@ export const dismissBannersUsingCookies = async (page: Page) => {
   await dismissTranslationBanner(page)
 }
 
+export const preparePageForTests = async (
+  page: Page,
+  breakpoint: Breakpoint
+) => {
+  await dismissAllBannersUsingCookies(page)
+  await closeFiltersUsingCookies(page)
+  await setBreakpointCookie(page, breakpoint)
+}
+
 export const goToSearchTerm = async (
   page: Page,
   term: string,
@@ -308,7 +299,7 @@ export const goToSearchTerm = async (
   const mode = options.mode ?? "SSR"
   const query = options.query ? `&${options.query}` : ""
 
-  await dismissBannersUsingCookies(page)
+  await dismissAllBannersUsingCookies(page)
   if (mode === "SSR") {
     const path = `${searchPath(searchType)}?q=${term}${query}`
     await page.goto(pathWithDir(path, dir))
@@ -352,6 +343,9 @@ export const openFirstResult = async (page: Page, mediaType: MediaType) => {
   const firstResultHref = await getLocatorHref(firstResult)
   await firstResult.click({ position: { x: 32, y: 32 } })
   await scrollDownAndUp(page)
+  // Wait for all pending requests to finish, at which point we know
+  // that all lazy-loaded content is available
+  // eslint-disable-next-line playwright/no-networkidle
   await page.waitForURL(firstResultHref, { waitUntil: "networkidle" })
   await page.mouse.move(0, 0)
 }
@@ -364,17 +358,35 @@ export const getLocatorHref = async (locator: Locator) => {
   return href
 }
 
-export const scrollToBottom = async (page: Page) => {
-  await page.evaluate(() => {
-    window.scrollTo(0, document.body.scrollHeight)
-  })
+/**
+ * Scroll the site to the "end" (top or bottom) of the primary scrollable element, either:
+ * - the `window`, on interior pages
+ * - the `#main-page`, on search views
+ *
+ * This is necessary because on search views the window itself doesnt scroll, only
+ * its child elements (the search result area + the filter sidebar).
+ *
+ * This function will scroll both elements on every evocation.
+ */
+export const fullScroll = async (
+  page: Page,
+  direction: "bottom" | "top" = "bottom"
+) => {
+  await page.evaluate((direction) => {
+    const mainPage = document.getElementById("main-page")
+    mainPage?.scrollTo(0, direction === "top" ? 0 : mainPage?.scrollHeight)
+    window.scrollTo(0, direction === "top" ? 0 : document.body.scrollHeight)
+  }, direction)
 }
 
 export const scrollToTop = async (page: Page) => {
-  await page.evaluate(() => {
-    window.scrollTo(0, 0)
-  })
-  await sleep(200)
+  await fullScroll(page, "top")
+  await sleep(200) // TODO: Is this necessary?
+}
+
+export const scrollToBottom = async (page: Page) => {
+  await fullScroll(page, "bottom")
+  await sleep(200) // TODO: Is this necessary?
 }
 
 /**

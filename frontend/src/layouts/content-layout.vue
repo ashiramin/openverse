@@ -1,31 +1,36 @@
 <template>
-  <div
-    class="app grid min-h-[100dvh] min-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] bg-white"
-    :class="[isDesktopLayout ? 'desktop' : 'mobile', breakpoint]"
-  >
-    <div class="header-el sticky top-0 z-40 block bg-white">
-      <VTeleportTarget name="skip-to-content" :force-destroy="true" />
-      <VBanners />
-      <VHeaderInternal
-        class="h-20 bg-white"
-        :class="{ 'border-b-dark-charcoal-20': isHeaderScrolled }"
-      />
-    </div>
+  <div>
+    <VSkipToContentButton />
+    <div
+      class="app grid min-h-[100dvh] min-h-screen grid-cols-1 grid-rows-[auto,1fr,auto] bg-white"
+      :class="[isDesktopLayout ? 'desktop' : 'mobile', breakpoint]"
+    >
+      <div class="header-el sticky top-0 z-40 block bg-white">
+        <VBanners />
+        <VHeaderInternal
+          class="h-20 border-b bg-white"
+          :class="
+            isHeaderScrolled ? 'border-b-dark-charcoal-20' : 'border-b-tx'
+          "
+        />
+      </div>
 
-    <div class="main-page flex h-full w-full min-w-0 flex-col justify-between">
-      <Nuxt />
-      <VFooter
-        mode="internal"
-        class="border-t border-dark-charcoal-20 bg-white"
-      />
-    </div>
+      <div
+        class="main-page flex h-full w-full min-w-0 flex-col justify-between"
+      >
+        <Nuxt />
+        <VFooter
+          mode="internal"
+          class="border-t border-dark-charcoal-20 bg-white"
+        />
+      </div>
 
-    <VModalTarget class="modal" />
+      <VModalTarget class="modal" />
+    </div>
   </div>
 </template>
 <script lang="ts">
 import { computed, defineComponent, onMounted, provide, ref, watch } from "vue"
-import { PortalTarget as VTeleportTarget } from "portal-vue"
 
 import { useWindowScroll } from "~/composables/use-window-scroll"
 import { useLayout } from "~/composables/use-layout"
@@ -33,12 +38,13 @@ import { useLayout } from "~/composables/use-layout"
 import { useUiStore } from "~/stores/ui"
 import { useFeatureFlagStore } from "~/stores/feature-flag"
 
-import { IsHeaderScrolledKey, ShowScrollButtonKey } from "~/types/provides"
+import { ShowScrollButtonKey } from "~/types/provides"
 
 import VBanners from "~/components/VBanner/VBanners.vue"
 import VFooter from "~/components/VFooter/VFooter.vue"
 import VModalTarget from "~/components/VModal/VModalTarget.vue"
 import VHeaderInternal from "~/components/VHeader/VHeaderInternal.vue"
+import VSkipToContentButton from "~/components/VSkipToContentButton.vue"
 
 /**
  * This is the ContentLayout: the search page, the single result page,
@@ -48,11 +54,11 @@ import VHeaderInternal from "~/components/VHeader/VHeaderInternal.vue"
 export default defineComponent({
   name: "ContentLayout",
   components: {
+    VSkipToContentButton,
     VBanners,
     VHeaderInternal,
     VFooter,
     VModalTarget,
-    VTeleportTarget,
   },
   setup() {
     const uiStore = useUiStore()
@@ -88,7 +94,6 @@ export default defineComponent({
     const showScrollButton = computed(() => scrollY.value > 70)
 
     provide(ShowScrollButtonKey, showScrollButton)
-    provide(IsHeaderScrolledKey, isHeaderScrolled)
 
     return {
       isHeaderScrolled,
